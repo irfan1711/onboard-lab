@@ -16,31 +16,62 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      platforms: ${{ steps.cfg.outputs.platforms }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate tenant config
+      - uses: actions/checkout@v5
+      - name: Read & validate tenant parameters
+        id: cfg
         run: |
-          test -f tenants/$TENANT.yaml || { echo "missing config"; exit 1; }
-          grep -q "tenant_id: \"$TENANT\"" tenants/$TENANT.yaml
-          ! grep -iE "password|secret_key|token:" tenants/$TENANT.yaml   # no secrets in config
+          F=tenants/$TENANT.yaml
+          test -f "$F" || { echo "::error::config missing for $TENANT"; exit 1; }
+
+          ID=$(yq '.tenant_id' "$F")
+          NAME=$(yq '.display_name' "$F")
+          CFG_ENV=$(yq '.environment' "$F")
+          PLATFORMS=$(yq -o=json -I=0 '.platforms' "$F")
+          VAULT=$(yq '.vault_path' "$F")
+
+          [ "$ID" = "$TENANT" ]           || { echo "::error::tenant_id mismatch"; exit 1; }
+          [ "$CFG_ENV" = "$ENVIRONMENT" ] || { echo "::error::env mismatch: config=$CFG_ENV event=$ENVIRONMENT"; exit 1; }
+          echo "$PLATFORMS" | jq -e 'length>0 and all(.[]; .=="linux" or .=="windows")' >/dev/null \
+                                          || { echo "::error::invalid platforms: $PLATFORMS"; exit 1; }
+          [ "$VAULT" = "secret/tenants/$TENANT" ] || { echo "::error::vault_path not scoped to tenant"; exit 1; }
+          ! grep -iE "password|secret_key|token:" "$F" || { echo "::error::secret found in config"; exit 1; }
+
+          echo "platforms=$PLATFORMS" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Tenant onboarding: \`$TENANT\`"
+            echo "| Parameter | Value |"
+            echo "|---|---|"
+            echo "| Tenant ID | $ID |"
+            echo "| Display name | $NAME |"
+            echo "| Environment | $CFG_ENV |"
+            echo "| Platforms | $PLATFORMS |"
+            echo "| Vault path | $VAULT |"
+            echo "| Config commit | \`$(git log -1 --format=%h -- "$F")\` |"
+            echo ""
+            echo "✅ All validation rules passed"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: validate
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        platform: ${{ fromJSON(needs.validate.outputs.platforms) }}
+    runs-on: ${{ matrix.platform == 'windows' && 'windows-latest' || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build client for tenant
         shell: bash
         run: |
           mkdir -p dist
-          echo "client build for $TENANT on ${{ runner.os }} ($ENVIRONMENT)" > dist/client-$TENANT-${{ runner.os }}.txt
-          sha256sum dist/* > dist/SHA256SUMS-${{ runner.os }}.txt
-      - uses: actions/upload-artifact@v4
+          echo "client build for $TENANT on ${{ matrix.platform }} ($ENVIRONMENT)" > dist/client-$TENANT-${{ matrix.platform }}.txt
+          sha256sum dist/* > dist/SHA256SUMS-${{ matrix.platform }}.txt
+      - uses: actions/upload-artifact@v5
         with:
-          name: client-${{ env.TENANT }}-${{ runner.os }}
+          name: client-${{ env.TENANT }}-${{ matrix.platform }}
           path: dist/
 
   deploy:
