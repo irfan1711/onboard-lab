@@ -1,0 +1,51 @@
+name: tenant-release
+on:
+  repository_dispatch:
+    types: [tenant-provisioned]
+  workflow_dispatch:
+    inputs:
+      tenant_id: { required: true }
+      environment: { required: true, default: dev }
+
+concurrency: tenant-${{ github.event.client_payload.tenant_id || inputs.tenant_id }}
+
+env:
+  TENANT: ${{ github.event.client_payload.tenant_id || inputs.tenant_id }}
+  ENVIRONMENT: ${{ github.event.client_payload.environment || inputs.environment }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tenant config
+        run: |
+          test -f tenants/$TENANT.yaml || { echo "missing config"; exit 1; }
+          grep -q "tenant_id: \"$TENANT\"" tenants/$TENANT.yaml
+          ! grep -iE "password|secret_key|token:" tenants/$TENANT.yaml   # no secrets in config
+
+  build:
+    needs: validate
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build client for tenant
+        shell: bash
+        run: |
+          mkdir -p dist
+          echo "client build for $TENANT on ${{ runner.os }} ($ENVIRONMENT)" > dist/client-$TENANT-${{ runner.os }}.txt
+          sha256sum dist/* > dist/SHA256SUMS-${{ runner.os }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-${{ env.TENANT }}-${{ runner.os }}
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.client_payload.environment || inputs.environment }}
+    steps:
+      - run: echo "Deploying $TENANT to $ENVIRONMENT (approval gate applies for prod)"
