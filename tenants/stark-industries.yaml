@@ -1,0 +1,5 @@
+tenant_id: "stark-industries"
+display_name: "stark-industries"
+environment: "prod"
+platforms: ["linux", "windows"]
+vault_path: "secret/tenants/stark-industries"
