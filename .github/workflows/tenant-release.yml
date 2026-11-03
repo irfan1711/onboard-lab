@@ -1,4 +1,5 @@
 name: tenant-release
+run-name: onboard ${{ github.event.client_payload.tenant_id || inputs.tenant_id }}
 on:
   repository_dispatch:
     types: [tenant-provisioned]

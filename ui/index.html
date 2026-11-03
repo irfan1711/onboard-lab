@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Customer Onboarding</title>
+<style>
+body{font-family:system-ui;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center;padding:40px}
+.card{background:#1e293b;padding:28px;border-radius:12px;width:420px}
+h2{margin-top:0}label{display:block;margin:14px 0 6px;font-size:14px;color:#94a3b8}
+input,select{width:100%;padding:9px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0}
+.row{display:flex;gap:16px}.row label{color:#e2e8f0}
+button{margin-top:20px;width:100%;padding:11px;border:0;border-radius:6px;background:#6366f1;color:#fff;font-weight:600;cursor:pointer}
+#out{margin-top:18px;padding:12px;border-radius:6px;background:#0f172a;font-size:14px;white-space:pre-wrap}
+a{color:#818cf8}
+</style></head><body><div class="card">
+<h2>Start your workspace</h2>
+<label>Company name</label><input id="name" placeholder="Acme Retail">
+<label>Workspace ID</label><input id="id" placeholder="acme-retail">
+<label>Environment</label>
+<select id="env"><option>dev</option><option>staging</option><option>prod</option></select>
+<label>Client platforms</label>
+<div class="row"><label><input type="checkbox" value="linux" checked style="width:auto"> Linux</label>
+<label><input type="checkbox" value="windows" style="width:auto"> Windows</label></div>
+<button onclick="go()">Onboard</button><div id="out">Ready.</div></div>
+<script>
+const out = document.getElementById('out');
+document.getElementById('name').oninput = e =>
+  document.getElementById('id').value = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+async function go(){
+  const body = {
+    tenant_id: document.getElementById('id').value,
+    display_name: document.getElementById('name').value,
+    environment: document.getElementById('env').value,
+    platforms: [...document.querySelectorAll('.row input:checked')].map(c => c.value)
+  };
+  out.textContent = 'Submitting...';
+  const r = await fetch('/tenants', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { out.textContent = '❌ ' + JSON.stringify(j.detail, null, 1); return; }
+  out.textContent = '✅ Accepted. Provisioning...';
+  poll(body.tenant_id);
+}
+async function poll(id){
+  const j = await (await fetch(`/tenants/${id}/status`)).json();
+  const link = j.url ? `<br><a href="${j.url}" target="_blank">View pipeline run</a>` : '';
+  out.innerHTML = `Tenant: <b>${id}</b><br>Status: <b>${j.status}</b>` +
+                  (j.conclusion ? `<br>Result: <b>${j.conclusion}</b>` : '') + link;
+  if (j.status !== 'completed') setTimeout(() => poll(id), 4000);
+}
+</script></body></html>
