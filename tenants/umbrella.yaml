@@ -1,0 +1,5 @@
+tenant_id: "umbrella"
+display_name: "Umbrella"
+environment: "dev"
+platforms: ["macos"]
+vault_path: "secret/tenants/umbrella"
