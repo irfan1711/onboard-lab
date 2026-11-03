@@ -1,0 +1,5 @@
+tenant_id: "toy-factory"
+display_name: "toy factory"
+environment: "prod"
+platforms: ["linux", "windows"]
+vault_path: "secret/tenants/toy-factory"
