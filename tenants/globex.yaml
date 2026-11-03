@@ -1,0 +1,5 @@
+tenant_id: "globex"
+display_name: "Globex"
+environment: "prod"
+platforms: ["linux", "windows"]
+vault_path: "secret/tenants/globex"
