@@ -1,0 +1,5 @@
+tenant_id: "wayne-enterprises"
+display_name: "Wayne Enterprises"
+environment: "dev"
+platforms: ["linux", "windows"]
+vault_path: "secret/tenants/wayne-enterprises"
