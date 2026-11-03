@@ -1,0 +1,5 @@
+tenant_id: "initech"
+display_name: "Initech"
+environment: "dev"
+platforms: ["linux"]
+vault_path: "secret/tenants/initech"
