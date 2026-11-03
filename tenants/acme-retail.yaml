@@ -1,0 +1,5 @@
+tenant_id: "acme-retail"
+display_name: "Acme Retail"
+environment: "dev"
+platforms: ["linux", "windows"]
+vault_path: "secret/tenants/acme-retail"
