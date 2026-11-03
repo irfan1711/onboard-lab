@@ -80,4 +80,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.client_payload.environment || inputs.environment }}
     steps:
-      - run: echo "Deploying $TENANT to $ENVIRONMENT (approval gate applies for prod)"
+      - name: Deploy tenant
+        run: echo "Deploying $TENANT to $ENVIRONMENT using approved template"
+      - name: Smoke test
+        id: smoke
+        run: |
+          echo "Checking tenant health endpoint / client heartbeat for $TENANT..."
+          # simulate: tenants starting with 'fail-' fail the smoke test
+          if [[ "$TENANT" == fail-* ]]; then echo "::error::smoke test failed"; exit 1; fi
+          echo "healthy" && echo "### ✅ $TENANT is live in $ENVIRONMENT" >> "$GITHUB_STEP_SUMMARY"
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rolling back $TENANT, marking as failed, alerting on-call"
+          echo "### ❌ $TENANT rolled back. On-call alerted" >> "$GITHUB_STEP_SUMMARY"
